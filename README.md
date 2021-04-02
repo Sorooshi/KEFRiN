@@ -6,7 +6,7 @@ The source codes, experimental test-beds and, the datasets of our paper titled "
 
 For more information on how to call our algorithms "KEFRiNe or "KEFRiNc," one can refer to the demo jupyter notebooks "demo.ipynb".
 
-Also this algorithm can be run through the terminal by calling: 
+Also thess algorithms can be run through the terminal by calling: 
             
     For using Euclidean distance:       
         python KEFRiN.py --Name="name of dataset in data dir" --PreProcessing="z-m" --Run=1 --Euclidean=1  --Cosine=0
