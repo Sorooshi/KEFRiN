@@ -1,0 +1,11 @@
+
+
+In this directory, two identical version of the real-world datasets are available.
+
+	1) The first version is provided within another directory so that the directory 
+		contains Y.npy, P.npy and ground_truth.npy --each representing the same matrix as mentioned in the paper.
+
+	2) *.pickle version, in this version 10 repeats of the aforementioned
+		 matrices are stored to make the computational experiments easier.
+
+

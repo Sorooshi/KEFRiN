@@ -1,0 +1,47 @@
+
+def flat_ground_truth(ground_truth):
+    """
+    :param ground_truth: the clusters/communities cardinality
+                        (output of cluster cardinality from synthetic data generator)
+    :return: two flat lists, the first one is the list of labels in an appropriate format
+             for applying sklearn metrics. And the second list is the list of lists of
+              containing indices of nodes in the corresponding cluster.
+    """
+    k = 1
+    interval = 1
+    labels_true, labels_true_indices = [], []
+    for v in ground_truth:
+        tmp_indices = []
+        for vv in range(v):
+            labels_true.append(k)
+            tmp_indices.append(interval+vv)
+
+        k += 1
+        interval += v
+        labels_true_indices += tmp_indices
+
+    return labels_true, labels_true_indices
+
+
+# name_of_datasets.pickle :="SC(200, 5, 5)" or SQ(200, 5, 5) or any other ones
+with open(os.path.join('path_to_datasets', 'name_of_datasets.pickle'), 'rb') as fp:
+    
+    SAN = pickle.load(fp)
+
+    for setting, repeats in SAN.items():
+
+         for repeat, matrices in repeats.items():
+
+            GT = matrices['GT']    # Ground Truth
+            grount_truth, _ = flat_ground_truth(GT)
+        
+            Yin  = matrices['Y']   # Entity-to-feature matrix
+          
+            Ynin = matrices['Yn']  # Noisy Entity-to-feature matrix
+        
+            Pin  = matrices['P']   # Adjacency matrix
+
+            "call your own Algorithm here"
+            .
+            .
+            .
