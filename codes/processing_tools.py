@@ -8,21 +8,14 @@ def preprocess_y(y_in, data_type):
 
     """
     input:
-    - y_in: numpy array for Entity-to-feature
+    - Y: numpy array for Entity-to-feature
     - nscf: Dict. the dict-key is the index of categorical variable V_l in Y, and dict-value is the number of
-        sub-categorie b_v (|V_l|) in categorical feature V_l.
+    sub-categorie b_v (|V_l|) in categorical feature V_l.
 
     App_ly Z-scoring, preprocessing by range, and Prof. Mirkin's 3-stage pre-processing methods.
     return: Original entity-to-feature data matrix, Z-scored preprocessed matrix, 2-stages preprocessed matrix,
-    3-stages preprocessed matrix and their corresponding relative contribution
+    3-stages preprocessed matrix and their coresponding relative contribution
     """
-
-    non_zero_features = np.where(np.ptp(y_in, axis=0) == 0.)[0]
-
-    if len(non_zero_features != 0):
-        print("The following features are being removed! \n")
-        print(non_zero_features)
-        y_in = y_in[:, non_zero_features]
 
     TY = np.sum(np.multiply(y_in, y_in))  # data scatter, the letter T stands for data scatter
     TY_v = np.sum(np.multiply(y_in, y_in), axis=0)  # feature scatter
@@ -31,7 +24,7 @@ def preprocess_y(y_in, data_type):
     Y_mean = np.mean(y_in, axis=0)
     Y_std = np.std(y_in, axis=0)
 
-    y_z = np.nan_to_num(np.divide(np.subtract(y_in, Y_mean), Y_std))  # Z-score
+    y_z = np.divide(np.subtract(y_in, Y_mean), Y_std)  # Z-score
 
     Ty_z = np.sum(np.multiply(y_z, y_z))
     Ty_z_v = np.sum(np.multiply(y_z, y_z), axis=0)
@@ -42,13 +35,12 @@ def preprocess_y(y_in, data_type):
     # rng_Y = scale_max_Y - scale_min_Y
     rng_Y = np.ptp(y_in, axis=0)
 
-    # 3 steps pre-processing (Range-without follow-up division)
-    y_rng = np.nan_to_num(np.divide(np.subtract(y_in, Y_mean), rng_Y))
+    y_rng = np.divide(np.subtract(y_in, Y_mean), rng_Y)  # 3 steps pre-processing (Range-without follow-up division)
     Ty_rng = np.sum(np.multiply(y_rng, y_rng))
     Ty_rng_v = np.sum(np.multiply(y_rng, y_rng), axis=0)
     y_rng_rel_cntr = Ty_rng_v / Ty_rng
 
-    # This section is not used for synthetic data, because no categorical data is generated.
+    # This section is not used for sy_nthetic data, because no categorical data is generated.
     y_rng_rs = deepcopy(y_rng)  # 3 steps preprocessing (Range-with follow-up division)
 
     nscf = {}
@@ -169,7 +161,7 @@ def flat_ground_truth(ground_truth):
     for v in ground_truth:
         tmp_indices = []
         for vv in range(v):
-            labels_true.append(int(k))
+            labels_true.append(k)
             tmp_indices.append(interval + vv)
 
         k += 1
