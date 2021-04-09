@@ -1,6 +1,6 @@
 # KEFRiN
 
-The source codes, experimental test-beds and, the datasets of our paper titled "K-Means Clustering Extended to Community Detection in Feature-Rich Networks" by [Soroosh Shalileh](https://www.hse.ru/en/org/persons/316426865) and [Boris Mirkin](https://www.hse.ru/en/staff/bmirkin), submitted to the of Infromation Science.
+The source codes, experimental test-beds and, the datasets of our paper entitled "K-Means Clustering Extended to Community Detection in Feature-Rich Networks" by [Soroosh Shalileh](https://www.hse.ru/en/org/persons/316426865) and [Boris Mirkin](https://www.hse.ru/en/staff/bmirkin), submitted to the of Infromation Science.
 
 
 
@@ -18,4 +18,4 @@ To restore the save results, run the above comments and set --Run to zero.
 
 Note that the above method for calling our proposed algorithms requires the dataset to in .pickle format as provided in the data directory.
 
-For generating similar synthetic data sets, One should call "synthetic_data_generator.py" as this is demonstrated in Jupyter notebook "MediumSize_synthetic_data.ipynb".
+For generating similar synthetic data sets, One should call "synthetic_data_generator.py" as this is demonstrated in Jupyter notebook "generate_synthetic_data.ipynb".
