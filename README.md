@@ -1,6 +1,6 @@
 # KEFRiN
 
-The source codes, experimental test-beds and, the datasets of our paper entitled "K-Means Clustering Extended to Community Detection in Feature-Rich Networks" by [Soroosh Shalileh](https://www.hse.ru/en/org/persons/316426865) and [Boris Mirkin](https://www.hse.ru/en/staff/bmirkin), submitted to the of Infromation Science.
+The source codes, experimental test-beds and, the datasets of our paper entitled "K-Means Clustering Extended to Community Detection in Feature-Rich Networks" by [Soroosh Shalileh](https://www.hse.ru/en/org/persons/316426865) and [Boris Mirkin](https://www.hse.ru/en/staff/bmirkin), submitted to the of Pattern Recognition.
 
 
 
