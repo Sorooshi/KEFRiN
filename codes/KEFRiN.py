@@ -31,15 +31,17 @@ def args_parser(args):
     kmean_pp = args.Kmeans_pp
     euclidean = args.Euclidean
     cosine = args.Cosine
+    manhattan = args.Manhattan
 #    minkowski = args.Minkowski
 
-    return name, run, rho, xi, n_clusters, with_noise, pp, setting, max_iterations, kmean_pp, euclidean, cosine
+    return name, run, rho, xi, n_clusters, with_noise, pp,\
+           setting, max_iterations, kmean_pp, euclidean, cosine, manhattan
 
 
-class KEFRiN:
+class EkifenMin:
 
-    def __init__(self, y, p, rho, xi, n_clusters, kmean_pp, euclidean, cosine, max_iteration):
-        super(KEFRiN, self).__init__()
+    def __init__(self, y, p, rho, xi, n_clusters, kmean_pp, euclidean, cosine, manhattan, max_iteration):
+        super(EkifenMin, self).__init__()
         self.y = y
         self.p = p
         self.rho = rho
@@ -48,6 +50,7 @@ class KEFRiN:
         self.kmeans_pp = kmean_pp
         self.euclidean = euclidean
         self.cosine = cosine
+        self.manhattan = manhattan
         self.max_iterations = max_iteration
         self.n = y.shape[0]  # number of entities/nodes/observations
         self.v = y.shape[1]  # number of features/attributes
@@ -60,7 +63,7 @@ class KEFRiN:
 
     @staticmethod
     def compute_euclidean(data_points, centroid):
-        return np.nansum(np.power(data_points-centroid, 2), axis=1)
+        return np.nansum(np.power(data_points - centroid, 2), axis=1)
 
     @staticmethod
     def compute_euclidean_(data_point, centroid):
@@ -80,6 +83,14 @@ class KEFRiN:
                             np.sqrt(np.nansum(centroid**2)+1e-10)))
 
     @staticmethod
+    def compute_manhattan(data_points, centroid):
+        return np.nansum(np.abs(data_points - centroid), axis=1)
+
+    @staticmethod
+    def compute_manhattan_(data_point, centroid):
+        return np.nansum(np.abs(data_point - centroid))
+
+    @staticmethod
     def compute_minkowski(data_points, centroid, p_value):
         return np.power(np.nansum(np.power(np.abs(data_points-centroid),
                                            p_value), axis=1), 1./p_value)
@@ -97,6 +108,9 @@ class KEFRiN:
                     elif self.cosine == 1:
                         d_y[i] = self.compute_cosine_(self.y[i, :], self.y[centroids_indices[k], :])
                         d_p[i] = self.compute_cosine_(self.p[i, :], self.p[centroids_indices[k], :])
+                    elif self.manhattan == 1:
+                        d_y[i] = self.compute_manhattan_(self.y[i, :], self.y[centroids_indices[k], :])
+                        d_p[i] = self.compute_manhattan_(self.p[i, :], self.p[centroids_indices[k], :])
             d_t = self.xi*d_p + self.rho*d_y
             next_center = np.argmax(d_t)
             centroids_indices.append(next_center)
@@ -106,7 +120,7 @@ class KEFRiN:
 
         return centroid_temp_y, centroid_temp_p
 
-    def apply_kefrin(self):
+    def apply_ekifen(self):
         # Initialization
         if self.kmeans_pp == 1:
             self.centroids_y, self.centroids_p = self.kmeans_plus_plus()
@@ -127,12 +141,17 @@ class KEFRiN:
             for k in range(self.centroids_y.shape[0]):
                 # computing the Euclidean distance of k-th cluster center
                 # with all n entries of the corresponding matrices
-                if self.euclidean:
+                if self.euclidean == 1:
                     tmp_distance_y = self.compute_euclidean(self.y, self.centroids_y[k, :])
                     tmp_distance_p = self.compute_euclidean(self.p, self.centroids_p[k, :])
-                elif self.cosine:
+
+                elif self.cosine == 1:
                     tmp_distance_y = self.compute_cosine(self.y, self.centroids_y[k, :])
                     tmp_distance_p = self.compute_cosine(self.p, self.centroids_p[k, :])
+
+                elif self.manhattan == 1:
+                    tmp_distance_y = self.compute_manhattan(self.y, self.centroids_y[k, :])
+                    tmp_distance_p = self.compute_manhattan(self.p, self.centroids_p[k, :])
 
                 # elif self.minkowski:
 
@@ -205,16 +224,34 @@ if __name__ == '__main__':
                         help='If it is set to one the Euclidean distance will be applied'
                              ' to measure the distance between centroids and data points')
 
-    parser.add_argument('--Cosine', type=int, default=1,
+    parser.add_argument('--Cosine', type=int, default=0,
                         help='If it is set to one the Cosine distance will be applied'
+                             ' to measure the distances between centroids and data points')
+
+    parser.add_argument('--Manhattan', type=int, default=1,
+                        help='If it is set to one the Manhattan distance will be applied'
                              ' to measure the distances between centroids and data points')
 
     args = parser.parse_args()
 
-    name, run, rho, xi, n_clusters, with_noise, pp, setting_, max_iterations,\
-    kmean_pp, euclidean, cosine = args_parser(args)
+    name, run, rho, xi, n_clusters, with_noise, pp, setting_,\
+    max_iterations, kmean_pp, euclidean, cosine, manhattan = args_parser(args)
 
     data_name = name.split('(')[0]
+
+    if manhattan == 1:
+        euclidean = 0
+        cosine = 0
+    elif cosine == 1:
+        euclidean = 0
+        manhattan = 0
+    elif euclidean == 1:
+        cosine = 0
+        manhattan = 0
+    else:
+        f = True
+        print("Wrong distance function assignment.")
+        assert f is True
 
     if with_noise == 1:
         data_name = data_name + "-N"
@@ -228,8 +265,9 @@ if __name__ == '__main__':
         with open(os.path.join('../data', name + ".pickle"), 'rb') as fp:
             DATA = pickle.load(fp)
 
-        print("run:", name, run, rho, xi, n_clusters, with_noise, pp,
-              setting_, type_of_data, 'cosine:', cosine, 'euclidean:', euclidean,
+        print("run:", name, run, rho, xi, n_clusters, with_noise, pp, "\n",
+              setting_, type_of_data, 'cosine:', cosine, "\n",
+              'euclidean:', euclidean, "Manhattan:", manhattan, "\n",
               'Kmeans plus plus:', kmean_pp)
 
         def apply_alg(data_type, with_noise):
@@ -317,92 +355,155 @@ if __name__ == '__main__':
                             # Pre-processing - Without Noise
                             if data_type == "NP".lower() and with_noise == 0:
                                 print("NP")
-                                tmp_ms = KEFRiN(y=y, p=p, rho=rho, xi=xi,
+                                tmp_ms = EkifenMin(y=y, p=p, rho=rho, xi=xi,
                                                    n_clusters=n_clusters,
-                                                   kmean_pp=kmean_pp, euclidean=euclidean, 
-                                                   cosine=cosine, max_iteration=max_iterations).apply_kefrin()
+                                                   kmean_pp=kmean_pp,
+                                                   euclidean=euclidean,
+                                                   cosine=cosine,
+                                                   manhattan=manhattan,
+                                                   max_iteration=max_iterations).apply_ekifen()
 
                             elif data_type == "z-u".lower() and with_noise == 0:
                                 print("z-u")
-                                tmp_ms = KEFRiN(y=y_z, p=p_u, rho=rho, xi=xi,
-                                                   n_clusters=n_clusters, kmean_pp=kmean_pp, euclidean=euclidean, 
-                                                   cosine=cosine, max_iteration=max_iterations).apply_kefrin()
+                                tmp_ms = EkifenMin(y=y_z, p=p_u, rho=rho, xi=xi,
+                                                   n_clusters=n_clusters,
+                                                   kmean_pp=kmean_pp,
+                                                   euclidean=euclidean,
+                                                   cosine=cosine,
+                                                   manhattan=manhattan,
+                                                   max_iteration=max_iterations).apply_ekifen()
 
                             elif data_type == "z-m".lower() and with_noise == 0:
 
-                                tmp_ms = KEFRiN(y=y_z, p=p_m, rho=rho, xi=xi,
-                                                   n_clusters=n_clusters, kmean_pp=kmean_pp, euclidean=euclidean, 
-                                                   cosine=cosine, max_iteration=max_iterations).apply_kefrin()
+                                tmp_ms = EkifenMin(y=y_z, p=p_m, rho=rho, xi=xi,
+                                                   n_clusters=n_clusters,
+                                                   kmean_pp=kmean_pp,
+                                                   euclidean=euclidean,
+                                                   cosine=cosine,
+                                                   manhattan=manhattan,
+                                                   max_iteration=max_iterations).apply_ekifen()
 
                             elif data_type == "z-l".lower() and with_noise == 0:
-                                tmp_ms = KEFRiN(y=y_z, p=p_l, rho=rho, xi=xi,
-                                                   n_clusters=n_clusters, kmean_pp=kmean_pp, euclidean=euclidean, 
-                                                   cosine=cosine, max_iteration=max_iterations).apply_kefrin()
+                                tmp_ms = EkifenMin(y=y_z, p=p_l, rho=rho, xi=xi,
+                                                   n_clusters=n_clusters,
+                                                   kmean_pp=kmean_pp,
+                                                   euclidean=euclidean,
+                                                   cosine=cosine,
+                                                   manhattan=manhattan,
+                                                   max_iteration=max_iterations).apply_ekifen()
 
                             elif data_type == "rng-u".lower() and with_noise == 0:
-                                tmp_ms = KEFRiN(y=y_rng, p=p_u, rho=rho, xi=xi,
-                                                   n_clusters=n_clusters, kmean_pp=kmean_pp, euclidean=euclidean, 
-                                                   cosine=cosine, max_iteration=max_iterations).apply_kefrin()
+                                tmp_ms = EkifenMin(y=y_rng, p=p_u, rho=rho, xi=xi,
+                                                   n_clusters=n_clusters,
+                                                   kmean_pp=kmean_pp,
+                                                   euclidean=euclidean,
+                                                   cosine=cosine,
+                                                   manhattan=manhattan,
+                                                   max_iteration=max_iterations).apply_ekifen()
 
                             elif data_type == "rng-m".lower() and with_noise == 0:
-                                tmp_ms = KEFRiN(y=y_rng, p=p_m, rho=rho, xi=xi,
-                                                   n_clusters=n_clusters, kmean_pp=kmean_pp, euclidean=euclidean, 
-                                                   cosine=cosine, max_iteration=max_iterations).apply_kefrin()
+                                tmp_ms = EkifenMin(y=y_rng, p=p_m, rho=rho, xi=xi,
+                                                   n_clusters=n_clusters,
+                                                   kmean_pp=kmean_pp,
+                                                   euclidean=euclidean,
+                                                   cosine=cosine,
+                                                   manhattan=manhattan,
+                                                   max_iteration=max_iterations).apply_ekifen()
 
                             elif data_type == "rng-l".lower() and with_noise == 0:
-                                tmp_ms = KEFRiN(y=y_rng, p=p_l, rho=rho, xi=xi,
-                                                   n_clusters=n_clusters, kmean_pp=kmean_pp, euclidean=euclidean, 
-                                                   cosine=cosine, max_iteration=max_iterations).apply_kefrin()
+                                tmp_ms = EkifenMin(y=y_rng, p=p_l, rho=rho, xi=xi,
+                                                   n_clusters=n_clusters,
+                                                   kmean_pp=kmean_pp,
+                                                   euclidean=euclidean,
+                                                   cosine=cosine,
+                                                   manhattan=manhattan,
+                                                   max_iteration=max_iterations).apply_ekifen()
 
                             # Pre-processing - With Noise
                             if data_type == "NP".lower() and with_noise == 1:
-                                tmp_ms = KEFRiN(y=y_n, p=p, rho=rho, xi=xi,
-                                                   n_clusters=n_clusters, kmean_pp=kmean_pp, euclidean=euclidean, 
-                                                   cosine=cosine, max_iteration=max_iterations).apply_kefrin()
+                                tmp_ms = EkifenMin(y=y_n, p=p, rho=rho, xi=xi,
+                                                   n_clusters=n_clusters,
+                                                   kmean_pp=kmean_pp,
+                                                   euclidean=euclidean,
+                                                   cosine=cosine,
+                                                   manhattan=manhattan,
+                                                   max_iteration=max_iterations).apply_ekifen()
 
                             elif data_type == "z-u".lower() and with_noise == 1:
-                                tmp_ms = KEFRiN(y=y_n_z, p=p_u, rho=rho, xi=xi,
-                                                   n_clusters=n_clusters, kmean_pp=kmean_pp, euclidean=euclidean, 
-                                                   cosine=cosine, max_iteration=max_iterations).apply_kefrin()
+                                tmp_ms = EkifenMin(y=y_n_z, p=p_u, rho=rho, xi=xi,
+                                                   n_clusters=n_clusters,
+                                                   kmean_pp=kmean_pp,
+                                                   euclidean=euclidean,
+                                                   cosine=cosine,
+                                                   manhattan=manhattan,
+                                                   max_iteration=max_iterations).apply_ekifen()
 
                             elif data_type == "z-m".lower() and with_noise == 1:
-                                tmp_ms = KEFRiN(y=y_n_z, p=p_m, rho=rho, xi=xi,
-                                                   n_clusters=n_clusters, kmean_pp=kmean_pp, euclidean=euclidean, 
-                                                   cosine=cosine, max_iteration=max_iterations).apply_kefrin()
+                                tmp_ms = EkifenMin(y=y_n_z, p=p_m, rho=rho, xi=xi,
+                                                   n_clusters=n_clusters,
+                                                   kmean_pp=kmean_pp,
+                                                   euclidean=euclidean,
+                                                   cosine=cosine,
+                                                   manhattan=manhattan,
+                                                   max_iteration=max_iterations).apply_ekifen()
 
                             elif data_type == "z-l".lower() and with_noise == 1:
-                                tmp_ms = KEFRiN(y=y_n_z, p=p_l, rho=rho, xi=xi,
-                                                   n_clusters=n_clusters, kmean_pp=kmean_pp, euclidean=euclidean, 
-                                                   cosine=cosine, max_iteration=max_iterations).apply_kefrin()
+                                tmp_ms = EkifenMin(y=y_n_z, p=p_l, rho=rho, xi=xi,
+                                                   n_clusters=n_clusters,
+                                                   kmean_pp=kmean_pp,
+                                                   euclidean=euclidean,
+                                                   cosine=cosine,
+                                                   manhattan=manhattan,
+                                                   max_iteration=max_iterations).apply_ekifen()
 
                             elif data_type == "rng-u".lower() and with_noise == 1:
-                                tmp_ms = KEFRiN(y=y_n_rng, p=p_u, rho=rho, xi=xi,
-                                                   n_clusters=n_clusters, kmean_pp=kmean_pp, euclidean=euclidean, 
-                                                   cosine=cosine, max_iteration=max_iterations).apply_kefrin()
+                                tmp_ms = EkifenMin(y=y_n_rng, p=p_u, rho=rho, xi=xi,
+                                                   n_clusters=n_clusters,
+                                                   kmean_pp=kmean_pp,
+                                                   euclidean=euclidean,
+                                                   cosine=cosine,
+                                                   manhattan=manhattan,
+                                                   max_iteration=max_iterations).apply_ekifen()
 
                             elif data_type == "rng-m".lower() and with_noise == 1:
-                                tmp_ms = KEFRiN(y=y_n_rng, p=p_m, rho=rho, xi=xi,
-                                                   n_clusters=n_clusters, kmean_pp=kmean_pp, euclidean=euclidean, 
-                                                   cosine=cosine, max_iteration=max_iterations).apply_kefrin()
+                                tmp_ms = EkifenMin(y=y_n_rng, p=p_m, rho=rho, xi=xi,
+                                                   n_clusters=n_clusters,
+                                                   kmean_pp=kmean_pp,
+                                                   euclidean=euclidean,
+                                                   cosine=cosine,
+                                                   manhattan=manhattan,
+                                                   max_iteration=max_iterations).apply_ekifen()
 
                             elif data_type == "rng-l".lower() and with_noise == 1:
-                                tmp_ms = KEFRiN(y=y_n_rng, p=p_l, rho=rho, xi=xi,
-                                                   n_clusters=n_clusters, kmean_pp=kmean_pp, euclidean=euclidean, 
-                                                   cosine=cosine, max_iteration=max_iterations).apply_kefrin()
+                                tmp_ms = EkifenMin(y=y_n_rng, p=p_l, rho=rho, xi=xi,
+                                                   n_clusters=n_clusters,
+                                                   kmean_pp=kmean_pp,
+                                                   euclidean=euclidean,
+                                                   cosine=cosine,
+                                                   manhattan=manhattan,
+                                                   max_iteration=max_iterations).apply_ekifen()
 
                             elif data_type == "rng-rng".lower():
                                 print("rng-rng")
                                 p, _, p_z, _, p_rng, _, = pt.preprocess_y(y_in=p, data_type='Q')
-                                tmp_ms = KEFRiN(y=y_rng, p=p_rng, rho=rho, xi=xi,
-                                                   n_clusters=n_clusters, kmean_pp=kmean_pp, euclidean=euclidean, 
-                                                   cosine=cosine, max_iteration=max_iterations).apply_kefrin()
+                                tmp_ms = EkifenMin(y=y_rng, p=p_rng, rho=rho, xi=xi,
+                                                   n_clusters=n_clusters,
+                                                   kmean_pp=kmean_pp,
+                                                   euclidean=euclidean,
+                                                   cosine=cosine,
+                                                   manhattan=manhattan,
+                                                   max_iteration=max_iterations).apply_ekifen()
 
                             elif data_type == "z-z".lower():
                                 print("z-z")
                                 p, _, p_z, _, p_rng, _, = pt.preprocess_y(y_in=p, data_type='Q')
-                                tmp_ms = KEFRiN(y=y_z, p=p_z, rho=rho, xi=xi,
-                                                   n_clusters=n_clusters, kmean_pp=kmean_pp, euclidean=euclidean, 
-                                                   cosine=cosine, max_iteration=max_iterations).apply_kefrin()
+                                tmp_ms = EkifenMin(y=y_z, p=p_z, rho=rho, xi=xi,
+                                                   n_clusters=n_clusters,
+                                                   kmean_pp=kmean_pp,
+                                                   euclidean=euclidean,
+                                                   cosine=cosine,
+                                                   manhattan=manhattan,
+                                                   max_iteration=max_iterations).apply_ekifen()
 
                             out_ms[setting][repeat] = tmp_ms
 
@@ -493,108 +594,188 @@ if __name__ == '__main__':
                         # Pre-processing - Without Noise
                         if data_type == "NP".lower() and with_noise == 0:
                             print("NP")
-                            tmp_ms = KEFRiN(y=y, p=p, rho=rho, xi=xi,
-                                               n_clusters=n_clusters, kmean_pp=kmean_pp, euclidean=euclidean,
-                                               cosine=cosine, max_iteration=max_iterations).apply_kefrin()
+                            tmp_ms = EkifenMin(y=y, p=p, rho=rho, xi=xi,
+                                               n_clusters=n_clusters,
+                                               kmean_pp=kmean_pp,
+                                               euclidean=euclidean,
+                                               cosine=cosine,
+                                               manhattan=manhattan,
+                                               max_iteration=max_iterations).apply_ekifen()
 
                         elif data_type == "z-NP".lower() and with_noise == 0:
-                            tmp_ms = KEFRiN(y=y_z, p=p, rho=rho, xi=xi,
-                                               n_clusters=n_clusters, kmean_pp=kmean_pp, euclidean=euclidean,
-                                               cosine=cosine, max_iteration=max_iterations).apply_kefrin()
+                            tmp_ms = EkifenMin(y=y_z, p=p, rho=rho, xi=xi,
+                                               n_clusters=n_clusters,
+                                               kmean_pp=kmean_pp,
+                                               euclidean=euclidean,
+                                               cosine=cosine,
+                                               manhattan=manhattan,
+                                               max_iteration=max_iterations).apply_ekifen()
 
                         elif data_type == "rng-NP".lower() and with_noise == 0:
-                            tmp_ms = KEFRiN(y=y_rng, p=p, rho=rho, xi=xi,
-                                               n_clusters=n_clusters, kmean_pp=kmean_pp, euclidean=euclidean,
-                                               cosine=cosine, max_iteration=max_iterations).apply_kefrin()
+                            tmp_ms = EkifenMin(y=y_rng, p=p, rho=rho, xi=xi,
+                                               n_clusters=n_clusters,
+                                               kmean_pp=kmean_pp,
+                                               euclidean=euclidean,
+                                               cosine=cosine,
+                                               manhattan=manhattan,
+                                               max_iteration=max_iterations).apply_ekifen()
 
                         elif data_type == "z-u".lower() and with_noise == 0:
                             print("z-u")
-                            tmp_ms = KEFRiN(y=y_z, p=p_u, rho=rho, xi=xi,
-                                               n_clusters=n_clusters, kmean_pp=kmean_pp, euclidean=euclidean,
-                                               cosine=cosine, max_iteration=max_iterations).apply_kefrin()
+                            tmp_ms = EkifenMin(y=y_z, p=p_u, rho=rho, xi=xi,
+                                               n_clusters=n_clusters,
+                                               kmean_pp=kmean_pp,
+                                               euclidean=euclidean,
+                                               cosine=cosine,
+                                               manhattan=manhattan,
+                                               max_iteration=max_iterations).apply_ekifen()
 
                         elif data_type == "z-m".lower() and with_noise == 0:
-                            tmp_ms = KEFRiN(y=y_z, p=p_m, rho=rho, xi=xi,
-                                               n_clusters=n_clusters, kmean_pp=kmean_pp, euclidean=euclidean,
-                                               cosine=cosine, max_iteration=max_iterations).apply_kefrin()
+                            tmp_ms = EkifenMin(y=y_z, p=p_m, rho=rho, xi=xi,
+                                               n_clusters=n_clusters,
+                                               kmean_pp=kmean_pp,
+                                               euclidean=euclidean,
+                                               cosine=cosine,
+                                               manhattan=manhattan,
+                                               max_iteration=max_iterations).apply_ekifen()
 
                         elif data_type == "z-l".lower() and with_noise == 0:
-                            tmp_ms = KEFRiN(y=y_z, p=p_l, rho=rho, xi=xi,
-                                               n_clusters=n_clusters, kmean_pp=kmean_pp, euclidean=euclidean,
-                                               cosine=cosine, max_iteration=max_iterations).apply_kefrin()
+                            tmp_ms = EkifenMin(y=y_z, p=p_l, rho=rho, xi=xi,
+                                               n_clusters=n_clusters,
+                                               kmean_pp=kmean_pp,
+                                               euclidean=euclidean,
+                                               cosine=cosine,
+                                               manhattan=manhattan,
+                                               max_iteration=max_iterations).apply_ekifen()
 
                         elif data_type == "rng-u".lower() and with_noise == 0:
-                            tmp_ms = KEFRiN(y=y_rng, p=p_u, rho=rho, xi=xi,
-                                               n_clusters=n_clusters, kmean_pp=kmean_pp, euclidean=euclidean,
-                                               cosine=cosine, max_iteration=max_iterations).apply_kefrin()
+                            tmp_ms = EkifenMin(y=y_rng, p=p_u, rho=rho, xi=xi,
+                                               n_clusters=n_clusters,
+                                               kmean_pp=kmean_pp,
+                                               euclidean=euclidean,
+                                               cosine=cosine,
+                                               manhattan=manhattan,
+                                               max_iteration=max_iterations).apply_ekifen()
 
                         elif data_type == "rng-m".lower() and with_noise == 0:
-                            tmp_ms = KEFRiN(y=y_rng, p=p_m, rho=rho, xi=xi,
-                                               n_clusters=n_clusters, kmean_pp=kmean_pp, euclidean=euclidean,
-                                               cosine=cosine, max_iteration=max_iterations).apply_kefrin()
+                            tmp_ms = EkifenMin(y=y_rng, p=p_m, rho=rho, xi=xi,
+                                               n_clusters=n_clusters,
+                                               kmean_pp=kmean_pp,
+                                               euclidean=euclidean,
+                                               cosine=cosine,
+                                               manhattan=manhattan,
+                                               max_iteration=max_iterations).apply_ekifen()
 
                         elif data_type == "rng-l".lower() and with_noise == 0:
-                            tmp_ms = KEFRiN(y=y_rng, p=p_l, rho=rho, xi=xi,
-                                               n_clusters=n_clusters, kmean_pp=kmean_pp, euclidean=euclidean,
-                                               cosine=cosine, max_iteration=max_iterations).apply_kefrin()
+                            tmp_ms = EkifenMin(y=y_rng, p=p_l, rho=rho, xi=xi,
+                                               n_clusters=n_clusters,
+                                               kmean_pp=kmean_pp,
+                                               euclidean=euclidean,
+                                               cosine=cosine,
+                                               manhattan=manhattan,
+                                               max_iteration=max_iterations).apply_ekifen()
 
                         elif data_type == "rng-rng".lower() and with_noise == 0:
-                            tmp_ms = KEFRiN(y=y_rng, p=p_rng, rho=rho, xi=xi,
-                                               n_clusters=n_clusters, kmean_pp=kmean_pp, euclidean=euclidean,
-                                               cosine=cosine, max_iteration=max_iterations).apply_kefrin()
+                            tmp_ms = EkifenMin(y=y_rng, p=p_rng, rho=rho, xi=xi,
+                                               n_clusters=n_clusters,
+                                               kmean_pp=kmean_pp,
+                                               euclidean=euclidean,
+                                               cosine=cosine,
+                                               manhattan=manhattan,
+                                               max_iteration=max_iterations).apply_ekifen()
 
                         elif data_type == "z-z".lower() and with_noise == 0:
-                            tmp_ms = KEFRiN(y=y_z, p=p_z, rho=rho, xi=xi,
-                                               n_clusters=n_clusters, kmean_pp=kmean_pp, euclidean=euclidean,
-                                               cosine=cosine, max_iteration=max_iterations).apply_kefrin()
+                            tmp_ms = EkifenMin(y=y_z, p=p_z, rho=rho, xi=xi,
+                                               n_clusters=n_clusters,
+                                               kmean_pp=kmean_pp,
+                                               euclidean=euclidean,
+                                               cosine=cosine,
+                                               manhattan=manhattan,
+                                               max_iteration=max_iterations).apply_ekifen()
 
                         # Pre-processing - With Noise
                         if data_type == "NP".lower() and with_noise == 1:
-                            tmp_ms = KEFRiN(y=y_n, p=p, rho=rho, xi=xi,
-                                               n_clusters=n_clusters, kmean_pp=kmean_pp, euclidean=euclidean,
-                                               cosine=cosine, max_iteration=max_iterations).apply_kefrin()
+                            tmp_ms = EkifenMin(y=y_n, p=p, rho=rho, xi=xi,
+                                               n_clusters=n_clusters,
+                                               kmean_pp=kmean_pp,
+                                               euclidean=euclidean,
+                                               cosine=cosine,
+                                               manhattan=manhattan,
+                                               max_iteration=max_iterations).apply_ekifen()
 
                         elif data_type == "z-u".lower() and with_noise == 1:
-                            tmp_ms = KEFRiN(y=y_n_z, p=p_u, rho=rho, xi=xi,
-                                               n_clusters=n_clusters, kmean_pp=kmean_pp, euclidean=euclidean,
-                                               cosine=cosine, max_iteration=max_iterations).apply_kefrin()
+                            tmp_ms = EkifenMin(y=y_n_z, p=p_u, rho=rho, xi=xi,
+                                               n_clusters=n_clusters,
+                                               kmean_pp=kmean_pp,
+                                               euclidean=euclidean,
+                                               cosine=cosine,
+                                               manhattan=manhattan,
+                                               max_iteration=max_iterations).apply_ekifen()
 
                         elif data_type == "z-m".lower() and with_noise == 1:
-                            tmp_ms = KEFRiN(y=y_n_z, p=p_m, rho=rho, xi=xi,
-                                               n_clusters=n_clusters, kmean_pp=kmean_pp, euclidean=euclidean,
-                                               cosine=cosine, max_iteration=max_iterations).apply_kefrin()
+                            tmp_ms = EkifenMin(y=y_n_z, p=p_m, rho=rho, xi=xi,
+                                               n_clusters=n_clusters,
+                                               kmean_pp=kmean_pp,
+                                               euclidean=euclidean,
+                                               cosine=cosine,
+                                               manhattan=manhattan,
+                                               max_iteration=max_iterations).apply_ekifen()
 
                         elif data_type == "z-l".lower() and with_noise == 1:
-                            tmp_ms = KEFRiN(y=y_n_z, p=p_l, rho=rho, xi=xi,
-                                               n_clusters=n_clusters, kmean_pp=kmean_pp, euclidean=euclidean,
-                                               cosine=cosine, max_iteration=max_iterations).apply_kefrin()
+                            tmp_ms = EkifenMin(y=y_n_z, p=p_l, rho=rho, xi=xi,
+                                               n_clusters=n_clusters,
+                                               kmean_pp=kmean_pp,
+                                               euclidean=euclidean,
+                                               cosine=cosine,
+                                               manhattan=manhattan,
+                                               max_iteration=max_iterations).apply_ekifen()
 
                         elif data_type == "rng-u".lower() and with_noise == 1:
-                            tmp_ms = KEFRiN(y=y_n_rng, p=p_u, rho=rho, xi=xi,
-                                               n_clusters=n_clusters, kmean_pp=kmean_pp, euclidean=euclidean,
-                                               cosine=cosine, max_iteration=max_iterations).apply_kefrin()
+                            tmp_ms = EkifenMin(y=y_n_rng, p=p_u, rho=rho, xi=xi,
+                                               n_clusters=n_clusters,
+                                               kmean_pp=kmean_pp,
+                                               euclidean=euclidean,
+                                               cosine=cosine,
+                                               manhattan=manhattan,
+                                               max_iteration=max_iterations).apply_ekifen()
 
                         elif data_type == "rng-m".lower() and with_noise == 1:
-                            tmp_ms = KEFRiN(y=y_n_rng, p=p_m, rho=rho, xi=xi,
-                                               n_clusters=n_clusters, kmean_pp=kmean_pp, euclidean=euclidean,
-                                               cosine=cosine, max_iteration=max_iterations).apply_kefrin()
+                            tmp_ms = EkifenMin(y=y_n_rng, p=p_m, rho=rho, xi=xi,
+                                               n_clusters=n_clusters,
+                                               kmean_pp=kmean_pp,
+                                               euclidean=euclidean,
+                                               cosine=cosine,
+                                               manhattan=manhattan,
+                                               max_iteration=max_iterations).apply_ekifen()
 
                         elif data_type == "rng-l".lower() and with_noise == 1:
-                            tmp_ms = KEFRiN(y=y_n_rng, p=p_l, rho=rho, xi=xi,
-                                               n_clusters=n_clusters, kmean_pp=kmean_pp, euclidean=euclidean,
-                                               cosine=cosine, max_iteration=max_iterations).apply_kefrin()
+                            tmp_ms = EkifenMin(y=y_n_rng, p=p_l, rho=rho, xi=xi,
+                                               n_clusters=n_clusters,
+                                               kmean_pp=kmean_pp,
+                                               euclidean=euclidean,
+                                               cosine=cosine,
+                                               manhattan=manhattan,
+                                               max_iteration=max_iterations).apply_ekifen()
 
                         elif data_type == "rng-rng".lower():
                             print("rng-rng")
-                            tmp_ms = KEFRiN(y=y_rng, p=p_rng, rho=rho, xi=xi,
-                                               n_clusters=n_clusters, kmean_pp=kmean_pp, euclidean=euclidean,
-                                               cosine=cosine, max_iteration=max_iterations).apply_kefrin()
+                            tmp_ms = EkifenMin(y=y_rng, p=p_rng, rho=rho, xi=xi,
+                                               n_clusters=n_clusters,
+                                               kmean_pp=kmean_pp,
+                                               euclidean=euclidean,
+                                               cosine=cosine,
+                                               manhattan=manhattan,
+                                               max_iteration=max_iterations).apply_ekifen()
 
                         elif data_type == "z-z".lower():
                             print("z-z")
-                            tmp_ms = KEFRiN(y=y_z, p=p_z, rho=rho, xi=xi,
-                                               n_clusters=n_clusters, kmean_pp=kmean_pp, euclidean=euclidean,
-                                               cosine=cosine, max_iteration=max_iterations).apply_kefrin()
+                            tmp_ms = EkifenMin(y=y_z, p=p_z, rho=rho, xi=xi,
+                                               n_clusters=n_clusters,
+                                               kmean_pp=kmean_pp,
+                                               euclidean=euclidean,
+                                               cosine=cosine,
+                                               manhattan=manhattan,
+                                               max_iteration=max_iterations).apply_ekifen()
 
                         out_ms[setting][repeat] = tmp_ms
 
@@ -630,6 +811,17 @@ if __name__ == '__main__':
 
             if setting_ == 'all':
                 with open(os.path.join('../data', "EKiFeNc" + name + "-" + pp + "-" +
+                                                  str(n_clusters) + ".pickle"), 'wb') as fp:
+                    pickle.dump(out_ms, fp)
+
+        elif manhattan:
+            if setting_ != 'all':
+                with open(os.path.join('../data', "EKiFeNm" + name + "-" + pp + "-" + setting_ + "-" +
+                                                  str(n_clusters) + ".pickle"), 'wb') as fp:
+                    pickle.dump(out_ms, fp)
+
+            if setting_ == 'all':
+                with open(os.path.join('../data', "EKiFeNm" + name + "-" + pp + "-" +
                                                   str(n_clusters) + ".pickle"), 'wb') as fp:
                     pickle.dump(out_ms, fp)
 
@@ -711,7 +903,7 @@ if __name__ == '__main__':
         if with_noise == 1:
             name = name + '-N'
 
-        if euclidean:
+        if euclidean == 1:
             if setting_ != 'all':
                 with open(os.path.join('../data', "EKiFeNe" + name + "-" + pp + "-" + setting_ + "-" +
                                                   str(n_clusters) + ".pickle"), 'rb') as fp:
@@ -722,7 +914,7 @@ if __name__ == '__main__':
                                                   str(n_clusters) + ".pickle"), 'rb') as fp:
                     out_ms = pickle.load(fp)
 
-        elif cosine:
+        elif cosine == 1:
             if setting_ != 'all':
                 with open(os.path.join('../data', "EKiFeNc" + name + "-" + pp + "-" + setting_ + "-" +
                                                   str(n_clusters) + ".pickle"), 'rb') as fp:
@@ -730,6 +922,17 @@ if __name__ == '__main__':
 
             if setting_ == 'all':
                 with open(os.path.join('../data', "EKiFeNc" + name + "-" + pp + "-" +
+                                                  str(n_clusters) + ".pickle"), 'rb') as fp:
+                    out_ms = pickle.load(fp)
+
+        elif manhattan == 1:
+            if setting_ != 'all':
+                with open(os.path.join('../data', "EKiFeNm" + name + "-" + pp + "-" + setting_ + "-" +
+                                                  str(n_clusters) + ".pickle"), 'rb') as fp:
+                    out_ms = pickle.load(fp)
+
+            if setting_ == 'all':
+                with open(os.path.join('../data', "EKiFeNm" + name + "-" + pp + "-" +
                                                   str(n_clusters) + ".pickle"), 'rb') as fp:
                     out_ms = pickle.load(fp)
 
