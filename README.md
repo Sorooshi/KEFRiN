@@ -19,6 +19,9 @@ Also thess algorithms can be run through the terminal by calling:
 
 To restore the save results, run the above comments and set --Run to zero.
 
+Note that the above method for calling our proposed algorithms requires the dataset to in .pickle format as provided in the data directory.
+
+For generating similar synthetic data sets, One should call "synthetic_data_generator.py" as this is demonstrated in Jupyter notebook "generate_synthetic_data.ipynb".
 
 
 
