@@ -1,0 +1,22 @@
+# Language detection configuration for GitHub
+# This project is primarily Python, not Jupyter Notebook
+
+# Exclude data generation notebooks from language statistics
+data/SyntheticData/*.ipynb linguist-generated=true
+*.ipynb linguist-documentation=true
+
+# Mark Python files as the primary language
+*.py linguist-language=Python
+
+# Exclude data files from language detection
+data/ linguist-vendored=true
+*.pickle linguist-generated=true
+*.npy linguist-generated=true
+*.mtx linguist-generated=true
+*.dat linguist-generated=true
+*.zip linguist-generated=true
+
+# Documentation
+*.md linguist-documentation=true
+*.txt linguist-documentation=true
+*.pdf linguist-documentation=true 

@@ -26,6 +26,25 @@ This is an optimized, production-ready implementation of the KEFRiN algorithm th
 - **KEFRiNc**: Cosine distance  
 - **KEFRiNm**: Manhattan distance
 
+## 📁 Repository Structure
+
+### Core Implementation Files
+- **`kefrin.py`** - Main implementation with optimized KEFRiN algorithm classes and functions
+- **`processing_tools.py`** - Data preprocessing, loading, and evaluation utilities
+- **`demo.py`** - Comprehensive demonstration script showing all features
+- **`reproduce_table9.py`** - Script to reproduce Table 9 results from the original paper
+- **`requirements.txt`** - Package dependencies
+
+### Data Directory
+- **`data/`** - Contains real-world and synthetic datasets
+  - Real-world datasets: HVR, Lawyers, World-Trade, Parliament, COSN, Amazon-Photo
+  - Synthetic data generation tools and sample datasets
+  - Ground truth files and network/feature matrices
+
+### Usage Examples
+- **`demo.py`** - Shows basic usage with sample and real data
+- **`data/SyntheticData/`** - Contains notebooks for synthetic data generation
+
 ## 🚀 Key Features
 
 ### Performance Optimizations
@@ -63,6 +82,15 @@ pip install -r requirements.txt
 - pandas >= 1.2.0
 
 ## 🏃‍♂️ Quick Start
+
+### Run the Demo
+```bash
+# Run comprehensive demo with sample and real data
+python demo.py
+
+# Reproduce Table 9 results from the paper
+python reproduce_table9.py
+```
 
 ### Simple Usage (Functional Interface)
 ```python
@@ -103,76 +131,100 @@ print(f"Inertia: {model.inertia_}")
 print(f"Iterations: {model.n_iter_}")
 ```
 
-### Data Preprocessing
+## 🔧 Scripts and Tools
 
-KEFRiN now supports flexible preprocessing methods that can be configured independently for features and networks:
+### 1. Demo Script (`demo.py`)
+Comprehensive demonstration showing:
+- Usage with synthetic sample data
+- Testing with real-world datasets
+- Parameter sensitivity analysis
+- Performance comparisons
+- All three distance metrics (Euclidean, Cosine, Manhattan)
 
-```python
-from kefrin import KEFRiN, KEFRiNConfig, PreprocessingMethod, DataPreprocessor
-
-# Method 1: Configure preprocessing in KEFRiNConfig
-config = KEFRiNConfig(
-    n_clusters=5,
-    preprocessing_y=PreprocessingMethod.MIN_MAX,    # Features: [0, 1] scaling
-    preprocessing_p=PreprocessingMethod.Z_SCORE     # Network: Z-score normalization
-)
-model = KEFRiN(config)
-labels = model.fit_predict(Y, P)
-
-# Method 2: Use convenience functions with preprocessing parameters
-labels = KEFRiNe(Y, P, n_clusters=5, 
-                preprocessing_y='range',     # Features: [-1, 1] scaling  
-                preprocessing_p='min_max')   # Network: [0, 1] scaling
-
-# Method 3: Standalone preprocessing
-preprocessor = DataPreprocessor()
-Y_processed, y_metadata = preprocessor.preprocess_features(Y, PreprocessingMethod.Z_SCORE)
-P_processed, p_metadata = preprocessor.preprocess_network(P, PreprocessingMethod.NONE)
+**Usage:**
+```bash
+python demo.py
 ```
 
-#### Available Preprocessing Methods:
+### 2. Table 9 Reproduction (`reproduce_table9.py`)
+Reproduces the experimental results from Table 9 of the original paper:
+- Tests on 5 real-world datasets (HVR, Lawyers, World-Trade, Parliament, COSN)
+- 10 random initializations per dataset
+- Computes average ARI scores
+- Saves results to CSV file
+
+**Usage:**
+```bash
+python reproduce_table9.py
+```
+
+**Expected Output:**
+- Console logging of progress and results
+- `table9_reproduction_results.csv` file with detailed results
+
+### 3. Processing Tools (`processing_tools.py`)
+Utility classes and functions:
+- **`OptimizedPreprocessor`**: Data preprocessing with multiple methods
+- **`OptimizedMetrics`**: Comprehensive clustering evaluation metrics
+- **`DataLoader`**: Flexible data loading for various formats
+
+**Key Classes:**
+```python
+from processing_tools import OptimizedPreprocessor, OptimizedMetrics, DataLoader
+
+# Data loading
+loader = DataLoader()
+Y, P, GT = loader.load_feature_network_data("Y.npy", "P.npy", "GT.npy")
+
+# Preprocessing
+preprocessor = OptimizedPreprocessor()
+Y_processed, _ = preprocessor.preprocess_features(Y, method='z-score')
+P_processed, _ = preprocessor.preprocess_network(P, method='modularity')
+
+# Evaluation
+metrics = OptimizedMetrics()
+results = metrics.compute_cluster_metrics(ground_truth, predicted_labels)
+```
+
+## 📊 Available Datasets
+
+The `data/` directory contains several real-world datasets used in the original paper:
+
+### Real-World Datasets
+- **HVR**: Hyperspectral image dataset
+- **Lawyers**: Legal advice network
+- **World-Trade**: International trade network
+- **Parliament**: Parliamentary voting network  
+- **COSN**: Co-authorship network
+- **Amazon-Photo**: Amazon product network
+
+### Synthetic Datasets
+- **Small datasets**: SC, SM, SQ (200 nodes, 5 features, 5 clusters)
+- **Medium datasets**: MC, MM, MQ (1000 nodes, 10 features, 15 clusters)
+- **Data generation notebooks**: For creating custom synthetic datasets
+
+Each dataset includes:
+- Feature matrix (Y): Node attributes
+- Network matrix (P): Adjacency/similarity matrix
+- Ground truth (GT): True cluster labels
+
+## 🎯 Preprocessing Options
+
+KEFRiN supports flexible preprocessing methods that can be configured independently for features and networks:
+
+### Feature Preprocessing Methods
 - **`'none'`**: No preprocessing (use raw data)
 - **`'z_score'`**: Z-score normalization (mean=0, std=1)
 - **`'min_max'`**: Min-Max scaling to [0, 1]
 - **`'range'`**: Range scaling to [-1, 1]
 
-### Evaluation and Metrics
-```python
-from processing_tools import OptimizedMetrics
-from sklearn import metrics
+### Network Preprocessing Methods
+- **`'none'`**: No preprocessing
+- **`'modularity'`**: Modularity-based preprocessing
+- **`'uniform'`**: Subtract mean interaction
+- **`'laplacian'`**: Laplacian transformation
 
-# Comprehensive evaluation
-evaluator = OptimizedMetrics()
-results = evaluator.compute_cluster_metrics(ground_truth, predicted_labels)
-
-print(f"ARI: {results['adjusted_rand_score']:.4f}")
-print(f"NMI: {results['normalized_mutual_info_score']:.4f}")
-print(f"Homogeneity: {results['homogeneity_score']:.4f}")
-```
-
-## 🔧 Configuration Options
-
-### Algorithm Parameters
-- `n_clusters`: Number of clusters to find
-- `rho`: Feature space weight coefficient (default: 1.0)
-- `xi`: Network space weight coefficient (default: 1.0)
-- `distance_metric`: Distance metric (EUCLIDEAN, COSINE, MANHATTAN)
-- `max_iterations`: Maximum number of iterations (default: 1000)
-- `tolerance`: Convergence tolerance (default: 1e-6)
-- `n_init`: Number of random initializations (default: 10)
-- `kmeans_plus_plus`: Use K-means++ initialization (default: True)
-- `random_state`: Random seed for reproducibility
-
-### Preprocessing Parameters
-- `preprocessing_y`: Feature preprocessing method (default: Z_SCORE)
-  - `PreprocessingMethod.NONE` or `'none'`: No preprocessing
-  - `PreprocessingMethod.Z_SCORE` or `'z_score'`: Z-score normalization
-  - `PreprocessingMethod.MIN_MAX` or `'min_max'`: Min-Max scaling [0, 1]
-  - `PreprocessingMethod.RANGE` or `'range'`: Range scaling [-1, 1]
-- `preprocessing_p`: Network preprocessing method (default: NONE)
-  - Same options as `preprocessing_y`
-
-## 📊 Performance Comparison
+## 📈 Performance Comparison
 
 The optimized implementation provides significant performance improvements:
 
@@ -185,7 +237,7 @@ The optimized implementation provides significant performance improvements:
 
 *Benchmarks run on Intel i7-8700K, 16GB RAM*
 
-## 🎯 Algorithm Details
+## 🔬 Algorithm Details
 
 ### Distance Metrics
 
@@ -200,177 +252,73 @@ The optimized implementation provides significant performance improvements:
    ```
    d(x,y) = 1 - (x·y)/(||x||·||y||)
    ```
-   - Best for: High-dimensional sparse features (e.g., text data)
-   - Characteristics: Magnitude-independent, good for directional similarity
+   - Best for: High-dimensional sparse features, text data
+   - Characteristics: Focuses on angle between vectors, scale-invariant
 
 3. **KEFRiNm (Manhattan Distance)**
    ```
    d(x,y) = Σ|xi - yi|
    ```
-   - Best for: Features with different scales, robust to outliers
-   - Characteristics: Less sensitive to outliers, good for mixed data types
+   - Best for: Features with different units, robust to outliers
+   - Characteristics: Less sensitive to outliers than Euclidean
 
-### Combined Objective Function
+### Algorithm Parameters
+
+#### Core Parameters
+- `n_clusters`: Number of clusters to find
+- `rho`: Feature space weight coefficient (default: 1.0)
+- `xi`: Network space weight coefficient (default: 1.0)
+- `distance_metric`: Distance metric (EUCLIDEAN, COSINE, MANHATTAN)
+
+#### Optimization Parameters
+- `max_iterations`: Maximum number of iterations (default: 1000)
+- `tolerance`: Convergence tolerance (default: 1e-6)
+- `n_init`: Number of random initializations (default: 10)
+- `kmeans_plus_plus`: Use K-means++ initialization (default: True)
+- `random_state`: Random seed for reproducibility
+
+#### Preprocessing Parameters
+- `preprocessing_y`: Feature preprocessing method (default: Z_SCORE)
+- `preprocessing_p`: Network preprocessing method (default: NONE)
+
+## 🏗️ Implementation Architecture
+
+### Class Hierarchy
 ```
-L = ρ × d_features + ξ × d_network
-```
-- `ρ` (rho): Controls importance of feature space
-- `ξ` (xi): Controls importance of network structure
+KEFRiN (main class)
+├── KEFRiNConfig (configuration)
+├── OptimizedDistance (distance computations)
+├── DataPreprocessor (preprocessing)
+└── KEFRiN_Legacy (backward compatibility)
 
-## 📁 File Structure
-
-```
-KEFRiN/
-├── kefrin.py                    # Main algorithm implementation
-├── processing_tools.py          # Data preprocessing and utilities
-├── demo.py                      # Comprehensive demo script
-├── reproduce_table9.py          # Script to reproduce Table 9 results
-├── requirements.txt             # Dependencies
-├── README.md                    # This file
-└── data/                        # Real-world datasets
-```
-
-## 🔄 Legacy Compatibility
-
-The optimized implementation maintains backward compatibility with the original interface:
-
-```python
-from kefrin import KEFRiN_Legacy
-
-# Original interface still works
-model = KEFRiN_Legacy(Y, P, n_clusters=5, euclidean=1, cosine=0, manhattan=0)
-labels = model.apply_kefrin()
-```
-
-## 🧪 Testing and Validation
-
-Run the comprehensive demo to test all functionality:
-
-```bash
-python demo_optimized.py
+Processing Tools
+├── OptimizedPreprocessor
+├── OptimizedMetrics
+└── DataLoader
 ```
 
-This will:
-- Test all three distance metrics
-- Demonstrate preprocessing options
-- Show parameter sensitivity analysis
-- Validate backward compatibility
-- Provide performance benchmarks
-
-## 📈 Usage Examples
-
-### Parameter Sensitivity Analysis
-```python
-# Test different parameter combinations
-rho_values = [0.1, 0.5, 1.0, 2.0, 5.0]
-xi_values = [0.1, 0.5, 1.0, 2.0, 5.0]
-
-best_ari = 0
-best_params = None
-
-for rho in rho_values:
-    for xi in xi_values:
-        labels = KEFRiNe(Y, P, n_clusters=k, rho=rho, xi=xi)
-        ari = adjusted_rand_score(ground_truth, labels)
-        
-        if ari > best_ari:
-            best_ari = ari
-            best_params = (rho, xi)
-
-print(f"Best parameters: rho={best_params[0]}, xi={best_params[1]}")
-```
-
-### Batch Processing Multiple Datasets
-```python
-import os
-from pathlib import Path
-
-datasets_dir = Path("data/")
-results = {}
-
-for dataset_path in datasets_dir.iterdir():
-    if dataset_path.is_dir():
-        try:
-            Y, P, GT = loader.load_feature_network_data(
-                y_path=dataset_path / "Y.npy",
-                p_path=dataset_path / "P.npy",
-                gt_path=dataset_path / "ground_truth.npy"
-            )
-            
-            # Test all three methods
-            for method_name, method_func in [("KEFRiNe", KEFRiNe), 
-                                           ("KEFRiNc", KEFRiNc), 
-                                           ("KEFRiNm", KEFRiNm)]:
-                labels = method_func(Y, P, n_clusters=len(np.unique(GT)))
-                ari = adjusted_rand_score(GT, labels)
-                
-                results[f"{dataset_path.name}_{method_name}"] = ari
-                
-        except Exception as e:
-            print(f"Failed to process {dataset_path.name}: {e}")
-
-# Print results summary
-for dataset_method, ari in sorted(results.items()):
-    print(f"{dataset_method}: ARI = {ari:.4f}")
-```
-
-## 🐛 Troubleshooting
-
-### Common Issues
-
-1. **Memory Errors with Large Datasets**
-   ```python
-   # Use data sampling for very large datasets
-   if Y.shape[0] > 10000:
-       indices = np.random.choice(Y.shape[0], size=10000, replace=False)
-       Y_sample = Y[indices]
-       P_sample = P[np.ix_(indices, indices)]
-   ```
-
-2. **Poor Convergence**
-   ```python
-   # Increase number of initializations and iterations
-   config = KEFRiNConfig(
-       n_init=20,              # More random starts
-       max_iterations=2000,    # More iterations
-       tolerance=1e-8          # Stricter convergence
-   )
-   ```
-
-3. **Preprocessing Issues**
-   ```python
-   # Check for NaN/inf values
-   validation = loader.validate_data(Y, P, GT)
-   if validation['issues']:
-       print("Data issues found:", validation['issues'])
-   ```
-
-## 📚 References
-
-- Original Paper: "Community Partitioning over Feature-Rich Networks Using an Extended K-Means Method"
-- Authors: Soroosh Shalileh and Boris Mirkin
-- Journal: Entropy
+### Key Features
+- **Vectorized Operations**: Batch distance computations using NumPy broadcasting
+- **Memory Optimization**: In-place operations and efficient memory usage
+- **Flexible Configuration**: Dataclass-based configuration system
+- **Comprehensive Logging**: Detailed progress and performance logging
+- **Error Handling**: Robust validation and error handling
 
 ## 🤝 Contributing
 
 1. Fork the repository
-2. Create a feature branch
-3. Add comprehensive tests
-4. Update documentation
-5. Submit a pull request
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
 
 ## 📄 License
 
-This project maintains the same license as the original KEFRiN implementation.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## 🆘 Support
+## 🙏 Acknowledgments
 
-For issues, questions, or contributions:
-1. Check the troubleshooting section
-2. Run the demo script to validate your setup
-3. Review the comprehensive logging output
-4. Open an issue with detailed error information
-
----
-
-**Note**: This optimized implementation is designed for production use with large datasets while maintaining full compatibility with the original KEFRiN algorithm. 
+- Original KEFRiN algorithm by Soroosh Shalileh and Boris Mirkin
+- Optimizations and production implementation
+- Real-world datasets from various research communities
+- Synthetic data generation framework 
