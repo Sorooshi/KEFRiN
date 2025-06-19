@@ -121,6 +121,140 @@ class OptimizedDistance:
         return distances
 
 
+class DataPreprocessor:
+    """Data preprocessing utilities for KEFRiN"""
+    
+    @staticmethod
+    def preprocess_features(y: np.ndarray, method: PreprocessingMethod) -> Tuple[np.ndarray, dict]:
+        """
+        Preprocess feature data using specified method
+        
+        Args:
+            y: Feature matrix (n_samples, n_features)
+            method: Preprocessing method to apply
+            
+        Returns:
+            Tuple of (preprocessed_data, preprocessing_metadata)
+        """
+        if method == PreprocessingMethod.NONE:
+            return y.copy(), {'method': 'none'}
+        
+        elif method == PreprocessingMethod.Z_SCORE:
+            y_mean = np.mean(y, axis=0)
+            y_std = np.std(y, axis=0)
+            y_std[y_std == 0] = 1  # Avoid division by zero
+            y_processed = (y - y_mean) / y_std
+            
+            metadata = {
+                'method': 'z_score',
+                'mean': y_mean,
+                'std': y_std
+            }
+            return y_processed, metadata
+        
+        elif method == PreprocessingMethod.MIN_MAX:
+            y_min = np.min(y, axis=0)
+            y_max = np.max(y, axis=0)
+            y_range = y_max - y_min
+            y_range[y_range == 0] = 1  # Avoid division by zero
+            y_processed = (y - y_min) / y_range
+            
+            metadata = {
+                'method': 'min_max',
+                'min': y_min,
+                'max': y_max,
+                'range': y_range
+            }
+            return y_processed, metadata
+        
+        elif method == PreprocessingMethod.RANGE:
+            # Range normalization: scale to [-1, 1]
+            y_min = np.min(y, axis=0)
+            y_max = np.max(y, axis=0)
+            y_range = y_max - y_min
+            y_range[y_range == 0] = 1  # Avoid division by zero
+            y_processed = 2 * (y - y_min) / y_range - 1
+            
+            metadata = {
+                'method': 'range',
+                'min': y_min,
+                'max': y_max,
+                'range': y_range
+            }
+            return y_processed, metadata
+        
+        else:
+            raise ValueError(f"Unknown preprocessing method: {method}")
+    
+    @staticmethod
+    def preprocess_network(p: np.ndarray, method: PreprocessingMethod) -> Tuple[np.ndarray, dict]:
+        """
+        Preprocess network data using specified method
+        
+        Args:
+            p: Network matrix (n_samples, n_samples)
+            method: Preprocessing method to apply
+            
+        Returns:
+            Tuple of (preprocessed_data, preprocessing_metadata)
+        """
+        if method == PreprocessingMethod.NONE:
+            return p.copy(), {'method': 'none'}
+        
+        elif method == PreprocessingMethod.Z_SCORE:
+            # For network data, apply z-score to each row
+            p_processed = np.zeros_like(p)
+            metadata = {'method': 'z_score', 'row_means': [], 'row_stds': []}
+            
+            for i in range(p.shape[0]):
+                row_mean = np.mean(p[i])
+                row_std = np.std(p[i])
+                if row_std == 0:
+                    row_std = 1
+                p_processed[i] = (p[i] - row_mean) / row_std
+                metadata['row_means'].append(row_mean)
+                metadata['row_stds'].append(row_std)
+            
+            metadata['row_means'] = np.array(metadata['row_means'])
+            metadata['row_stds'] = np.array(metadata['row_stds'])
+            return p_processed, metadata
+        
+        elif method == PreprocessingMethod.MIN_MAX:
+            p_min = np.min(p)
+            p_max = np.max(p)
+            p_range = p_max - p_min
+            if p_range == 0:
+                p_range = 1
+            p_processed = (p - p_min) / p_range
+            
+            metadata = {
+                'method': 'min_max',
+                'min': p_min,
+                'max': p_max,
+                'range': p_range
+            }
+            return p_processed, metadata
+        
+        elif method == PreprocessingMethod.RANGE:
+            p_min = np.min(p)
+            p_max = np.max(p)
+            p_range = p_max - p_min
+            if p_range == 0:
+                p_range = 1
+            p_processed = 2 * (p - p_min) / p_range - 1
+            
+            metadata = {
+                'method': 'range',
+                'min': p_min,
+                'max': p_max,
+                'range': p_range
+            }
+            return p_processed, metadata
+        
+        else:
+            raise ValueError(f"Unknown preprocessing method: {method}")
+
+
 class KEFRiN:
     """
     Optimized KEFRiN algorithm implementation
@@ -134,6 +268,7 @@ class KEFRiN:
     def __init__(self, config: KEFRiNConfig):
         self.config = config
         self.distance_computer = OptimizedDistance()
+        self.preprocessor = DataPreprocessor()
         
         # Set random state for reproducibility
         if config.random_state is not None:
@@ -142,6 +277,8 @@ class KEFRiN:
         # Initialize attributes
         self.y_processed_ = None
         self.p_processed_ = None
+        self.y_metadata_ = None
+        self.p_metadata_ = None
         self.centroids_y_ = None
         self.centroids_p_ = None
         self.labels_ = None
@@ -257,16 +394,16 @@ class KEFRiN:
     def fit(self, y: np.ndarray, p: np.ndarray) -> 'KEFRiN':
         """Fit the KEFRiN model to data"""
         logger.info(f"Starting KEFRiN fitting with {self.config.distance_metric.value} distance")
+        logger.info(f"Preprocessing: Y={self.config.preprocessing_y.value}, P={self.config.preprocessing_p.value}")
         start_time = time.time()
         
-        # Preprocess data (z-score normalization for features)
-        y_mean = np.mean(y, axis=0)
-        y_std = np.std(y, axis=0)
-        y_std[y_std == 0] = 1  # Avoid division by zero
-        self.y_processed_ = (y - y_mean) / y_std
-        
-        # For network data, use as is or apply simple normalization
-        self.p_processed_ = p
+        # Preprocess data using configured methods
+        self.y_processed_, self.y_metadata_ = self.preprocessor.preprocess_features(
+            y, self.config.preprocessing_y
+        )
+        self.p_processed_, self.p_metadata_ = self.preprocessor.preprocess_network(
+            p, self.config.preprocessing_p
+        )
         
         # Run algorithm multiple times and select best result
         best_inertia = float('inf')
@@ -290,6 +427,29 @@ class KEFRiN:
         
         return self
     
+    def preprocess_data(self, y: np.ndarray, p: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+        """
+        Preprocess data using configured methods without fitting the model
+        
+        Args:
+            y: Feature matrix (n_samples, n_features)
+            p: Network matrix (n_samples, n_samples)
+            
+        Returns:
+            Tuple of (preprocessed_y, preprocessed_p)
+        """
+        y_processed, self.y_metadata_ = self.preprocessor.preprocess_features(
+            y, self.config.preprocessing_y
+        )
+        p_processed, self.p_metadata_ = self.preprocessor.preprocess_network(
+            p, self.config.preprocessing_p
+        )
+        
+        self.y_processed_ = y_processed
+        self.p_processed_ = p_processed
+        
+        return y_processed, p_processed
+    
     def fit_predict(self, y: np.ndarray, p: np.ndarray) -> np.ndarray:
         """Fit the model and return cluster labels"""
         self.fit(y, p)
@@ -302,15 +462,34 @@ class KEFRiN:
 
 # Convenience functions for the three versions
 def KEFRiNe(y: np.ndarray, p: np.ndarray, rho: float = 1.0, xi: float = 1.0, 
-           n_clusters: int = 5, max_iteration: int = 1000, kmean_pp: bool = True) -> np.ndarray:
-    """KEFRiN with Euclidean distance (KEFRiNe)"""
+           n_clusters: int = 5, max_iteration: int = 1000, kmean_pp: bool = True,
+           preprocessing_y: str = 'z_score', preprocessing_p: str = 'none') -> np.ndarray:
+    """KEFRiN with Euclidean distance (KEFRiNe)
+    
+    Args:
+        y: Feature matrix (n_samples, n_features)
+        p: Network matrix (n_samples, n_samples)
+        rho: Feature importance weight
+        xi: Network importance weight
+        n_clusters: Number of clusters
+        max_iteration: Maximum iterations
+        kmean_pp: Use K-means++ initialization
+        preprocessing_y: Feature preprocessing method ('none', 'z_score', 'min_max', 'range')
+        preprocessing_p: Network preprocessing method ('none', 'z_score', 'min_max', 'range')
+    """
+    # Convert string preprocessing methods to enums
+    preproc_y = PreprocessingMethod(preprocessing_y)
+    preproc_p = PreprocessingMethod(preprocessing_p)
+    
     config = KEFRiNConfig(
         n_clusters=n_clusters,
         rho=rho,
         xi=xi,
         distance_metric=DistanceMetric.EUCLIDEAN,
         max_iterations=max_iteration,
-        kmeans_plus_plus=kmean_pp
+        kmeans_plus_plus=kmean_pp,
+        preprocessing_y=preproc_y,
+        preprocessing_p=preproc_p
     )
     
     model = KEFRiN(config)
@@ -318,15 +497,34 @@ def KEFRiNe(y: np.ndarray, p: np.ndarray, rho: float = 1.0, xi: float = 1.0,
 
 
 def KEFRiNc(y: np.ndarray, p: np.ndarray, rho: float = 1.0, xi: float = 1.0,
-           n_clusters: int = 5, max_iteration: int = 1000, kmean_pp: bool = True) -> np.ndarray:
-    """KEFRiN with Cosine distance (KEFRiNc)"""
+           n_clusters: int = 5, max_iteration: int = 1000, kmean_pp: bool = True,
+           preprocessing_y: str = 'z_score', preprocessing_p: str = 'none') -> np.ndarray:
+    """KEFRiN with Cosine distance (KEFRiNc)
+    
+    Args:
+        y: Feature matrix (n_samples, n_features)
+        p: Network matrix (n_samples, n_samples)
+        rho: Feature importance weight
+        xi: Network importance weight
+        n_clusters: Number of clusters
+        max_iteration: Maximum iterations
+        kmean_pp: Use K-means++ initialization
+        preprocessing_y: Feature preprocessing method ('none', 'z_score', 'min_max', 'range')
+        preprocessing_p: Network preprocessing method ('none', 'z_score', 'min_max', 'range')
+    """
+    # Convert string preprocessing methods to enums
+    preproc_y = PreprocessingMethod(preprocessing_y)
+    preproc_p = PreprocessingMethod(preprocessing_p)
+    
     config = KEFRiNConfig(
         n_clusters=n_clusters,
         rho=rho,
         xi=xi,
         distance_metric=DistanceMetric.COSINE,
         max_iterations=max_iteration,
-        kmeans_plus_plus=kmean_pp
+        kmeans_plus_plus=kmean_pp,
+        preprocessing_y=preproc_y,
+        preprocessing_p=preproc_p
     )
     
     model = KEFRiN(config)
@@ -334,15 +532,34 @@ def KEFRiNc(y: np.ndarray, p: np.ndarray, rho: float = 1.0, xi: float = 1.0,
 
 
 def KEFRiNm(y: np.ndarray, p: np.ndarray, rho: float = 1.0, xi: float = 1.0,
-           n_clusters: int = 5, max_iteration: int = 1000, kmean_pp: bool = True) -> np.ndarray:
-    """KEFRiN with Manhattan distance (KEFRiNm)"""
+           n_clusters: int = 5, max_iteration: int = 1000, kmean_pp: bool = True,
+           preprocessing_y: str = 'z_score', preprocessing_p: str = 'none') -> np.ndarray:
+    """KEFRiN with Manhattan distance (KEFRiNm)
+    
+    Args:
+        y: Feature matrix (n_samples, n_features)
+        p: Network matrix (n_samples, n_samples)
+        rho: Feature importance weight
+        xi: Network importance weight
+        n_clusters: Number of clusters
+        max_iteration: Maximum iterations
+        kmean_pp: Use K-means++ initialization
+        preprocessing_y: Feature preprocessing method ('none', 'z_score', 'min_max', 'range')
+        preprocessing_p: Network preprocessing method ('none', 'z_score', 'min_max', 'range')
+    """
+    # Convert string preprocessing methods to enums
+    preproc_y = PreprocessingMethod(preprocessing_y)
+    preproc_p = PreprocessingMethod(preprocessing_p)
+    
     config = KEFRiNConfig(
         n_clusters=n_clusters,
         rho=rho,
         xi=xi,
         distance_metric=DistanceMetric.MANHATTAN,
         max_iterations=max_iteration,
-        kmeans_plus_plus=kmean_pp
+        kmeans_plus_plus=kmean_pp,
+        preprocessing_y=preproc_y,
+        preprocessing_p=preproc_p
     )
     
     model = KEFRiN(config)
@@ -386,4 +603,34 @@ class KEFRiN_Legacy:
 
 
 # For backward compatibility, create an alias
-KEFRiN_Original = KEFRiN_Legacy 
+KEFRiN_Original = KEFRiN_Legacy
+
+# Export main classes and functions
+__all__ = [
+    'DistanceMetric',
+    'PreprocessingMethod', 
+    'KEFRiNConfig',
+    'DataPreprocessor',
+    'OptimizedDistance',
+    'KEFRiN',
+    'KEFRiNe',
+    'KEFRiNc', 
+    'KEFRiNm',
+    'KEFRiN_Legacy',
+    'KEFRiN_Original'
+]
+
+# Export main classes and functions
+__all__ = [
+    'DistanceMetric',
+    'PreprocessingMethod', 
+    'KEFRiNConfig',
+    'DataPreprocessor',
+    'OptimizedDistance',
+    'KEFRiN',
+    'KEFRiNe',
+    'KEFRiNc', 
+    'KEFRiNm',
+    'KEFRiN_Legacy',
+    'KEFRiN_Original'
+] 

@@ -104,22 +104,37 @@ print(f"Iterations: {model.n_iter_}")
 ```
 
 ### Data Preprocessing
+
+KEFRiN now supports flexible preprocessing methods that can be configured independently for features and networks:
+
 ```python
-from processing_tools import OptimizedPreprocessor, DataLoader
+from kefrin import KEFRiN, KEFRiNConfig, PreprocessingMethod, DataPreprocessor
 
-# Load data with automatic format detection
-loader = DataLoader()
-Y, P, GT = loader.load_feature_network_data(
-    y_path="data/features.npy",
-    p_path="data/network.npy", 
-    gt_path="data/ground_truth.npy"
+# Method 1: Configure preprocessing in KEFRiNConfig
+config = KEFRiNConfig(
+    n_clusters=5,
+    preprocessing_y=PreprocessingMethod.MIN_MAX,    # Features: [0, 1] scaling
+    preprocessing_p=PreprocessingMethod.Z_SCORE     # Network: Z-score normalization
 )
+model = KEFRiN(config)
+labels = model.fit_predict(Y, P)
 
-# Preprocess data
-preprocessor = OptimizedPreprocessor()
-Y_processed, y_meta = preprocessor.preprocess_features(Y, method='z-score')
-P_processed, p_meta = preprocessor.preprocess_network(P, method='modularity')
+# Method 2: Use convenience functions with preprocessing parameters
+labels = KEFRiNe(Y, P, n_clusters=5, 
+                preprocessing_y='range',     # Features: [-1, 1] scaling  
+                preprocessing_p='min_max')   # Network: [0, 1] scaling
+
+# Method 3: Standalone preprocessing
+preprocessor = DataPreprocessor()
+Y_processed, y_metadata = preprocessor.preprocess_features(Y, PreprocessingMethod.Z_SCORE)
+P_processed, p_metadata = preprocessor.preprocess_network(P, PreprocessingMethod.NONE)
 ```
+
+#### Available Preprocessing Methods:
+- **`'none'`**: No preprocessing (use raw data)
+- **`'z_score'`**: Z-score normalization (mean=0, std=1)
+- **`'min_max'`**: Min-Max scaling to [0, 1]
+- **`'range'`**: Range scaling to [-1, 1]
 
 ### Evaluation and Metrics
 ```python
@@ -148,9 +163,14 @@ print(f"Homogeneity: {results['homogeneity_score']:.4f}")
 - `kmeans_plus_plus`: Use K-means++ initialization (default: True)
 - `random_state`: Random seed for reproducibility
 
-### Preprocessing Options
-- **Features**: 'z-score', 'min-max', 'range', 'none'
-- **Network**: 'modularity', 'uniform', 'laplacian', 'none'
+### Preprocessing Parameters
+- `preprocessing_y`: Feature preprocessing method (default: Z_SCORE)
+  - `PreprocessingMethod.NONE` or `'none'`: No preprocessing
+  - `PreprocessingMethod.Z_SCORE` or `'z_score'`: Z-score normalization
+  - `PreprocessingMethod.MIN_MAX` or `'min_max'`: Min-Max scaling [0, 1]
+  - `PreprocessingMethod.RANGE` or `'range'`: Range scaling [-1, 1]
+- `preprocessing_p`: Network preprocessing method (default: NONE)
+  - Same options as `preprocessing_y`
 
 ## 📊 Performance Comparison
 
