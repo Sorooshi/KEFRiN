@@ -1,6 +1,25 @@
-# KEFRiN Optimized: Production-Ready Implementation
+# KEFRiN: Production-Ready Implementation
 
 **Community Partitioning over Feature-Rich Networks Using an Extended K-Means Method**
+
+## Citation
+
+If you use this implementation in your research, please cite:
+
+```bibtex
+@article{shalileh2022community,
+  title={Community partitioning over feature-rich networks using an extended k-means method},
+  author={Shalileh, Soroosh and Mirkin, Boris},
+  journal={Entropy},
+  volume={24},
+  number={5},
+  pages={626},
+  year={2022},
+  publisher={MDPI}
+}
+```
+
+**Reference**: Shalileh S, Mirkin B. Community partitioning over feature-rich networks using an extended k-means method. Entropy. 2022 Apr 29;24(5):626.
 
 This is an optimized, production-ready implementation of the KEFRiN algorithm that supports all three distance metrics:
 - **KEFRiNe**: Euclidean distance
@@ -48,7 +67,7 @@ pip install -r requirements.txt
 ### Simple Usage (Functional Interface)
 ```python
 import numpy as np
-from kefrin_optimized import KEFRiNe, KEFRiNc, KEFRiNm
+from kefrin import KEFRiNe, KEFRiNc, KEFRiNm
 
 # Load your data
 Y = np.load('features.npy')  # Feature matrix (n_samples, n_features)
@@ -62,7 +81,7 @@ labels_manhattan = KEFRiNm(Y, P, n_clusters=5, rho=1.0, xi=1.0)
 
 ### Advanced Usage (Object-Oriented Interface)
 ```python
-from kefrin_optimized import KEFRiN, KEFRiNConfig, DistanceMetric
+from kefrin import KEFRiN, KEFRiNConfig, DistanceMetric
 
 # Configure the algorithm
 config = KEFRiNConfig(
@@ -86,7 +105,7 @@ print(f"Iterations: {model.n_iter_}")
 
 ### Data Preprocessing
 ```python
-from processing_tools_optimized import OptimizedPreprocessor, DataLoader
+from processing_tools import OptimizedPreprocessor, DataLoader
 
 # Load data with automatic format detection
 loader = DataLoader()
@@ -104,7 +123,7 @@ P_processed, p_meta = preprocessor.preprocess_network(P, method='modularity')
 
 ### Evaluation and Metrics
 ```python
-from processing_tools_optimized import OptimizedMetrics
+from processing_tools import OptimizedMetrics
 from sklearn import metrics
 
 # Comprehensive evaluation
@@ -181,13 +200,14 @@ L = ρ × d_features + ξ × d_network
 ## 📁 File Structure
 
 ```
-kefrin_optimized/
-├── kefrin_optimized.py          # Main algorithm implementation
-├── processing_tools_optimized.py # Data preprocessing and utilities
-├── demo_optimized.py            # Comprehensive demo script
+KEFRiN/
+├── kefrin.py                    # Main algorithm implementation
+├── processing_tools.py          # Data preprocessing and utilities
+├── demo.py                      # Comprehensive demo script
+├── reproduce_table9.py          # Script to reproduce Table 9 results
 ├── requirements.txt             # Dependencies
-├── README_OPTIMIZED.md          # This file
-└── tests/                       # Unit tests (recommended)
+├── README.md                    # This file
+└── data/                        # Real-world datasets
 ```
 
 ## 🔄 Legacy Compatibility
@@ -195,7 +215,7 @@ kefrin_optimized/
 The optimized implementation maintains backward compatibility with the original interface:
 
 ```python
-from kefrin_optimized import KEFRiN_Legacy
+from kefrin import KEFRiN_Legacy
 
 # Original interface still works
 model = KEFRiN_Legacy(Y, P, n_clusters=5, euclidean=1, cosine=0, manhattan=0)
